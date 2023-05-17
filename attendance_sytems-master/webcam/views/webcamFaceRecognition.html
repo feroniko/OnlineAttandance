@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="face-api.js"></script>
+  <script src="js/commons.js"></script>
+  <script src="js/drawing.js"></script>
+  <script src="js/faceDetectionControls.js"></script>
+  <script src="js/webcamRecognition.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  
+    <div style="position: relative" class="margin">
+      <video onplay="onPlay(this)" id="inputVideo" autoplay muted></video>
+      <canvas id="overlay" />
+    </div>
+</body>
+
+  <script>
+    async function onPlay() {
+      const videoEl = document.getElementById('inputVideo');
+      if(videoEl.paused || videoEl.ended || !isFaceDetectionModelLoaded())
+        return setTimeout(() => onPlay());
+      
+      const options = getFaceDetectorOptions();
+      const result = await faceapi.detectSingleFace(videoEl, options).withFaceLandmarks().withFaceDescriptor();
+
+      if (result) {
+        let canvas = document.getElementById('overlay');
+        var resizedResults = resizeCanvasAndResults(videoEl, canvas, [result]);
+
+        const boxesWithText = resizedResults.map(({ detection, descriptor }) =>
+          new faceapi.BoxWithText(
+            detection.box,
+            faceMatcher.findBestMatch(result.descriptor).toString()
+          )
+        );
+        faceapi.drawDetection(canvas, boxesWithText);
+      }
+
+      setTimeout(() => onPlay());
+    }
+
+    async function run() {
+      // load face detection model
+
+      await changeFaceDetector(TINY_FACE_DETECTOR);
+
+      await faceapi.loadFaceLandmarkModel('/');
+      await faceapi.loadFaceRecognitionModel('/');
+
+      faceMatcher = await createFaceMatcher(1);
+
+      // try to access users webcam and stream the images
+      // to the video element
+      const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+      const videoEl = document.getElementById('inputVideo');
+      videoEl.srcObject = stream;
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      run();
+    });
+  </script>
+</body>
+</html>
